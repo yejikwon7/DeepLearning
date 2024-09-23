@@ -1,0 +1,104 @@
+import numpy as np
+import tensorflow as tf
+import tensorflow.keras.datasets as da
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import  Conv2D, MaxPooling2D, Dense, Dropout, Flatten
+from tensorflow.keras.optimizers import Adam
+
+(x_train, y_train), (x_test, y_test) = da.mnist.load_data()
+x_train = x_train.reshape(60000, 28, 28, 1) # 흑백
+x_test = x_test.reshape(10000, 28, 28, 1) # reshape 이미지 만듦
+x_train = x_train.astype(np.float32)/255.0
+x_test = x_test.astype(np.float32)/255.0 # normalize: 0~1로 맞춤
+y_train = tf.keras.utils.to_categorical(y_train, 10)
+y_test = tf.keras.utils.to_categorical(y_test, 10) # one-hot
+
+cnn = Sequential() # 형태: add로 차례차례 작성
+# 따로 떼어내기 위해서는 functional 구조 필요
+cnn.add(Conv2D(6, (5, 5), padding='same', activation='relu', input_shape=(28, 28, 1))) # 6: filter / (5, 5): 마스크 / same: padding 동일하게 유지 / depth=6 / 커널 28*28*6
+cnn.add(MaxPooling2D(pool_size=(2, 2), strides=2)) # strides: 겹치지 않도록 2로 설정
+cnn.add(Conv2D(16, (5, 5), padding='valid', activation='relu')) # valid: padding 수행하지 않음 -> output 증가
+cnn.add(MaxPooling2D(pool_size=(2, 2), strides=2))
+cnn.add(Conv2D(120, (5, 5), padding='valid', activation='relu')) # => 특징 추출
+cnn.add(Flatten()) # 1차원 구조로 변환
+cnn.add(Dense(units=84, activation='relu')) # 중간 도구 -> 걸러냄
+cnn.add(Dense(units=10, activation='softmax'))
+
+cnn.compile(loss='categorical_crossentropy', optimizer=Adam(learning_rate=0.001), metrics=['accuracy'])
+cnn.fit(x_train, y_train, batch_size=128, epochs=30, validation_data=(x_test, y_test), verbose=2)
+
+res = cnn.evaluate(x_test, y_test, verbose=0)
+print('정확률 =', res[1]*100) # 평가 진행
+
+y_prob = cnn.predict(x_test)
+predicted = y_prob.argmax(axis=-1)
+print(predicted)
+
+import matplotlib.pyplot as plt
+fig = plt.figure(figsize=(10, 7))
+fig.subplots_adjust(left=0, right=1, bottom=0, top=1, hspace=0.05, wspace=0.05)
+
+# plot the images : each image is 28x28 pixels
+j = 0
+for i in range(10000):
+    if predicted[i] != np.argmax(y_test[i]): # 잘못된 것만 추림
+      ax = fig.add_subplot(12, 10, j+1, xticks=[], yticks=[])
+      ax.imshow(x_test[i, :].reshape(28, 28), cmap=plt.cm.gray_r, interpolation='nearest')
+      # label the image with the red text
+      ax.text(0, 7, predicted[i], color='red')
+      j = j + 1
+
+import numpy as np
+import tensorflow as tf
+import tensorflow.keras.datasets as ds
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D,MaxPooling2D,Flatten,Dense,Dropout
+from tensorflow.keras.optimizers import Adam
+
+(x_train,y_train),(x_test,y_test)=ds.cifar10.load_data()
+x_train=x_train.astype(np.float32)/255.0
+x_test=x_test.astype(np.float32)/255.0
+y_train=tf.keras.utils.to_categorical(y_train,10)
+y_test=tf.keras.utils.to_categorical(y_test,10)
+
+cnn=Sequential()
+cnn.add(Conv2D(32,(3,3),activation='relu',input_shape=(32,32,3)))
+cnn.add(Conv2D(32,(3,3),activation='relu'))
+cnn.add(MaxPooling2D(pool_size=(2,2)))
+cnn.add(Dropout(0.25)) # 규제 기법
+cnn.add(Conv2D(64,(3,3),activation='relu'))
+cnn.add(Conv2D(64,(3,3),activation='relu'))
+cnn.add(MaxPooling2D(pool_size=(2,2)))
+cnn.add(Dropout(0.25))
+cnn.add(Flatten())
+cnn.add(Dense(units=512,activation='relu'))
+cnn.add(Dropout(0.5))
+cnn.add(Dense(units=10,activation='softmax')) # 데이터 전처리
+
+cnn.compile(loss='categorical_crossentropy',optimizer=Adam(learning_rate=0.001),metrics=['accuracy'])
+hist=cnn.fit(x_train,y_train,batch_size=128,epochs=100,validation_data=(x_test,y_test),verbose=2) # hist : 상태 저장
+
+res=cnn.evaluate(x_test,y_test,verbose=0)
+print('정확률=',res[1]*100)
+
+import matplotlib.pyplot as plt
+
+plt.plot(hist.history['accuracy'])
+plt.plot(hist.history['val_accuracy'])
+plt.title('Accuracy graph')
+plt.ylabel('Accuracy')
+plt.xlabel('Epoch')
+plt.legend(['Train','Validation'])
+plt.grid()
+plt.show()
+
+plt.plot(hist.history['loss'])
+plt.plot(hist.history['val_loss'])
+plt.title('Loss graph')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.legend(['Train','Validation'])
+plt.grid()
+plt.show()
