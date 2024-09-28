@@ -102,3 +102,36 @@ plt.xlabel('Epoch')
 plt.legend(['Train','Validation'])
 plt.grid()
 plt.show()
+
+# 자연 영상 인식 코드
+y_prob = cnn.predict(x_test)
+predicted = y_prob.argmax(axis=-1)
+print(predicted)
+
+# 1. 배열 생성
+classname = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+# 정답에 대한 문자 갖는 배열 추가
+
+# 2. 배열 이름[인덱스]
+y_prob = cnn.predict(x_test)
+predicted = y_prob.argmax(axis=-1)
+print(predicted)
+
+import matplotlib.pyplot as plt
+fig = plt.figure(figsize=(15, 7))
+fig.subplots_adjust(left=0, right=1, bottom=0, top=1, hspace=0.05, wspace=0.05)
+
+# plot the images : each image is 32x32x3 pixels
+j = 0
+for i in range(100): # 오분류 데이터 너무 많으면 안되므로 100개만
+# 정확도가 높지 않기 때문
+    if predicted[i] != np.argmax(y_test[i]): # 예측한 것과 정답값 비교
+      ax = fig.add_subplot(3, 7, j+1, xticks=[], yticks=[])
+      ax.imshow(x_test[i, :].reshape(32, 32, 3), interpolation='nearest')
+      # label the image with the blue text
+      # 3. ar.text(파란색 정답)
+      ax.text(0, 3, classname[predicted[i]], color='red') # 예측된 결과
+      ax.text(0, 10, classname[np.argmax(y_test[i])], color='blue') # 실제 정답값
+      j = j + 1
+# 평가 결과 evalutate : 정답을 함께 줌, 성능 평가
+# 오분류 함수 : predict, 결과값이 나옴
