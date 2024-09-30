@@ -1,0 +1,67 @@
+import cv2 as cv
+from google.colab.patches import cv2_imshow
+import numpy as np
+from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input, decode_predictions
+
+model = ResNet50(weights='imagenet')
+
+img = cv.imread('rabbit.jpg')
+x = np.reshape(cv.resize(img, (224, 224)), (1, 224, 224, 3))
+x = preprocess_input(x)
+
+preds = model.predict(x)
+top5 = decode_predictions(preds,top=5)[0]
+print('예측 결과:', top5)
+
+for i in range(5):
+  cv.putText(img, top5[i][1] + ':' + str(top5[i][2]), (10, 20 + i*20), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+
+cv2_imshow(img)
+
+cv.waitKey()
+cv.destroyAllWindows()
+
+import tensorflow as tf
+def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None):
+  # 마지막 feature maps과 모델을 최종 예측값을 동시에 출력하는 모델을 새롭게 정의한다.
+  grad_model = tf.keras.models.Model(
+      [model.inputs], [model.get_layer(last_conv_layer_name).output, model.output] # 어디까지 진행할지 모델 만듦
+  )
+  # 미분값 계산
+  with tf.GradientTape() as tape: # gradient 계산 위해 필요
+    last_conv_layer_output, preds = grad_model(img_array)
+    # 가장 확률값이 큰 예측값에 대응하는 클래스(혹은 함수의 인자로 전달한 클래스)만을 고려
+    if pred_index is None:
+      pred_index = tf.argmax(preds[0]) # yc 계산 위한 작업
+    class_channel = preds[:, pred_index]
+
+    # 모델의 어떤 한 클래스에 대한 예측값(class_channel)을 마지막 feature maps(last_conv_layer_output)으로 미분
+    grads=tape.gradient(class_channel, last_conv_layer_output)
+
+    # 각 채널마다 등장한 미분값들을 평균 내리기(채널의 중요도를 결정)
+    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+    last_conv_layer_output = last_conv_layer_output[0]
+    # @는 행렬곱 연산, 채널의 중요도를 가중치로 가중합을 구함
+    heatmap = last_conv_layer_output @ pooled_grads[..., tf.newaxis]
+    heatmap = tf.squeeze(heatmap) # 축 squeeze하여 없애주기([높이, 너비, 1] -> [높이, 너비] 됨)
+
+    # 0과 1사이 값으로 만듦
+    heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap) # 음수 없애기 / 전체 max값 찾음
+    return heatmap.numpy() # CAM 만들어짐
+
+heatmap = make_gradcam_heatmap(x, model, 'conv5_block3_out')
+
+img = cv.imread('dog1.jpg')
+# heatmap을 원본 이미지 크기에 맞게 변경
+heatmap = cv.resize(heatmap, (img.shape[1], img.shape[0]))
+# heatmap을 RGB 포맷으로 변환
+heatmap = np.uint8(255 * heatmap)
+# 히트맵으로 변환
+heatmap = cv.applyColorMap(heatmap, cv.COLORMAP_JET)
+# 0.4는 히트맵의 강도
+superimposed_img = heatmap * 0.4 + img
+
+cv2_imshow(superimposed_img)
+
+# 어떻게 진행되는지 확인 가능
+model.summary()
