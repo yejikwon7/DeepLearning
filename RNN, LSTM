@@ -1,0 +1,111 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# 코인데스크 사이트에서 다운로드한 1년치 비트코인 가격 데이터 읽기
+f = open('BTC_USD_2019-02-28_2020-02-27-CoinDesk.csv', 'r')
+coindesk_data = pd.read_csv(f, header=0) # 첫 번째 행을 헤더로 사용하라는 지시
+seq = coindesk_data[['Closing Price (USD)']].to_numpy() # 종가만 취함 / Closing Price 행을 취하고 넘파이 배열로 변환
+print('데이터 길이: ', len(seq), '\n앞쪽 5개 값: ', seq[0:5]) # 앞쪽 다섯 개 샘플을 취함
+
+# 그래프로 데이터 확인
+plt.plot(seq, color='red')
+plt.title('Bitcoin Prices (1 year from 2019-02-28)')
+plt.xlabel('Days')
+plt.ylabel('Price in USD')
+plt.show()
+
+# 시계열 데이터를 윈도우 단위로 자르는 함수
+def seq2dataset(seq, window, horizon):
+    X=[]
+    Y=[]
+    for i in range(len(seq)-(window + horizon) + 1): # 전체 개수만큼
+        x=seq[i:(i+window)]
+        y=(seq[i+window+horizon-1])
+        X.append(x)
+        Y.append(y)
+    return np.array(X), np.array(Y)
+
+w=7 # 윈도우 크기
+h=1 # 수평선 계수
+
+X,Y=seq2dataset(seq,w,h)
+print(X.shape, Y.shape)
+# 맨 앞과 맨 뒤 샘플을 출력
+print(X[0], Y[0])
+print(X[-1], Y[-1]) 
+
+print('전체 데이터의 크기: ', len(X), len(Y))
+
+# 훈련 집합과 테스트 집합으로 분할
+split = int(len(X)*0.7)
+x_train = X[0:split]
+y_train = Y[0:split]
+x_test = X[split:]
+y_test = Y[split:]
+
+print('훈련 데이터의 크기: ', x_train.shape, y_train.shape)
+print('테스트 데이터의 크기: ', x_test.shape, y_test.shape)
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import SimpleRNN, Dense
+
+# RNN 모델 설계와 학습
+model=Sequential()
+model.add(SimpleRNN(units=128, activation='relu', input_shape=x_train[0].shape)) # 모델
+model.add(Dense(1))
+model.compile(loss='mae', optimizer='adam', metrics=['mae'])
+hist = model.fit(x_train, y_train, epochs=200, batch_size=1, validation_data=(x_test, y_test), verbose=2)
+
+# RNN 모델 평가
+ev = model.evaluate(x_test, y_test, verbose=0)
+print("손실 함수: ", ev[0], "MAE: ", ev[1])
+
+# RNN 모델로 예측 수행
+pred = model.predict(x_test)
+print("평균 절댓값 백분율 오차(MAPE): ", sum(abs(y_test-pred)/y_test)/len(x_test))
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, LSTM, Dropout
+
+# LSTM 모델 설계와 학습
+model=Sequential()
+model.add(LSTM(units=128, activation='relu', input_shape=x_train[0].shape)) # 모델
+model.add(Dense(1))
+model.compile(loss='mae', optimizer='adam', metrics=['mae'])
+hist = model.fit(x_train, y_train, epochs=200, batch_size=1, validation_data=(x_test, y_test), verbose=2)
+
+# LSTM 모델 평가
+ev = model.evaluate(x_test, y_test, verbose=0)
+print("손실 함수: ", ev[0], "MAE: ", ev[1])
+
+# LSTM 모델로 예측 수행
+pred = model.predict(x_test)
+print("평균 절댓값 백분율 오차(MAPE): ", sum(abs(y_test-pred)/y_test)/len(x_test))
+
+# 학습 곡선
+plt.plot(hist.history['mae'])
+plt.plot(hist.history['val_mae'])
+plt.title('Model mae')
+plt.ylabel('mae')
+plt.xlabel('Epoch')
+plt.ylim([120, 800])
+plt.legend(['Train', 'Validation'], loc='best')
+plt.grid()
+plt.show()
+
+# 예측 결과 시각화
+x_range=range(len(y_test))
+plt.plot(x_range, y_test[x_range], color='red')
+plt.plot(x_range, pred[x_range], color='blue')
+plt.title(['True prices', 'Predicted prices'], loc='best')
+plt.grid()
+plt.show()
+
+# 일부 구간을 확대하여 시각화
+x_range=range(50, 64)
+plt.plot(x_range, y_test[x_range], color='red')
+plt.plot(x_range, pred[x_range], color='blue')
+plt.title(['True prices', 'Predicted prices'], loc='best')
+plt.grid()
+plt.show()
